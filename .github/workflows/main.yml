@@ -1,0 +1,65 @@
+
+name: New_project
+
+on:
+  pull_request:
+    types:
+      - labeled
+      - unlabeled
+      - synchronize
+      - opened
+      - edited
+      - ready_for_review
+      - reopened
+      - unlocked
+  pull_request_review:
+    types:
+      - submitted
+  check_suite:
+    types:
+      - completed
+  status: {}
+
+jobs:
+  automerge:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest numpy scikit-learn
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Check file "Calculator.py" existence
+      id: check_file_calc
+      uses: andstor/file-existence-action@v1
+      with:
+        files: "project2/Calculator.py"
+      
+    - name: Test calc
+      if: steps.check_file_calc.outputs.files_exists == 'true'
+      run: |
+        pytest project2/TestCalculator.py      run: |
+        pytest project2/tests/test_model_selection.py
+    
+    - name: merge pull request
+      run: |
+        curl \
+        -X PUT \
+        -H "Accept: application/vnd.github.v3+json" \
+         --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
+        ${{ github.event.pull_request.url }}/merge \
+        -d '{"commit_title":"automerging pr ${{github.event.pull_request.number }} for ${{ github.event.pull_request.user.login }}" }' 
